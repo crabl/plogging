@@ -2,8 +2,8 @@
 // Intro                                              //
 ////////////////////////////////////////////////////////
 
-var bunyan = require('bunyan');
-var log = bunyan.createLogger({
+const bunyan = require('bunyan');
+const log = bunyan.createLogger({
   src: true,
   name: 'life',
   streams: [{
@@ -17,30 +17,53 @@ var log = bunyan.createLogger({
 
 log.level(bunyan.INFO);
 
-var express = require('express');
-var bodyParser = require('body-parser');
-var app = express();
+const express = require('express');
+const bodyParser = require('body-parser');
+const app = express();
 app.use(bodyParser());
 //app.use(bodyParser.urlencoded({extended: true}));
 
-var uuidGen = require('node-uuid');
+const uuidGen = require('node-uuid');
 
-var sugar = require('sugar');
+const sugar = require('sugar');
 
 ////////////////////////////////////////////////////////
 // Mod                                                //
 ////////////////////////////////////////////////////////
 
 // Modifier of any sort.  Usually an adpositional phrase.
-function Mod(tag, value) {
-  // A tag, usually a preposition, for this modifier.
-  // 
-  // Always a string.  The null string is interpreted to
-  // mean "direct object".
-  this.tag = tag;
+class Mod {
+  constructor(tag, value) {
+    // A tag, usually a preposition, for this modifier.
+    //
+    // Always a string.  The null string is interpreted to
+    // mean "direct object".
+    this.tag = tag;
 
-  // The value of the modifier.  Can be rich content.
-  this.value = value;
+    // The value of the modifier.  Can be rich content.
+    this.value = value;
+  }
+
+  toString() {
+    let tag = this.tag;
+
+    if (this.tag) {
+      tag += ' ';
+    }
+
+    return tag + this.value.toString();
+  }
+
+  toJson() {
+    return {
+      tag: this.tag,
+      value: this.value
+    };
+  }
+
+  toHtml() {
+    return this.toString();
+  }
 }
 
 // Factory method to load a mod from json
@@ -48,108 +71,97 @@ function loadMod(json) {
   return new Mod(json.tag, json.value);
 }
 
-Mod.prototype.toString = function() {
-  return (this.tag ? this.tag + ' ' : '') + this.value.toString();
-}
-
-Mod.prototype.toJson = function() {
-  return {
-    tag:   this.tag,
-    value: this.value
-  };
-}
-
-Mod.prototype.toHtml = function() {
-  return this.toString();
-}
-
 ////////////////////////////////////////////////////////
 // Fact                                               //
 ////////////////////////////////////////////////////////
-
-function Fact(subject, verb, mods, uuid) {
-  this.verb = verb;
-  this.subject = subject;
-  this.mods = mods
-  this.uuid = uuid || uuidGen.v4();
-};
 
 // Factory method to load a fact from json.
 function loadFact(json) {
   return new Fact(json.subject, json.verb, json.mods.map(loadMod), json.uuid);
 }
 
-Fact.prototype.toString = function() {
-  var modString = this.mods.length === 0 ? '' : ' ' + this.mods.map(function(mod) {
-    return mod.toString();
-  }).join(' ');
+class Fact {
+  constructor(subject, verb, mods, uuid=uuidGen.v4()) {
+    this.verb = verb;
+    this.subject = subject;
+    this.mods = mods;
+    this.uuid = uuid;
+  }
 
-  return this.subject + ' ' + this.verb + modString + '.';
-}
+  toString() {
+    var modString = this.mods.length === 0 ? '' : ' ' + this.mods.map(function(mod) {
+      return mod.toString();
+    }).join(' ');
 
-Fact.prototype.toJson = function() {
-  return {
-    subject: this.subject,
-    verb:    this.verb,
-    mods:    this.mods.map(function(mod) { return mod.toJson(); }),
-    uuid:    this.uuid
-  };
-}
+    return this.subject + ' ' + this.verb + modString + '.';
+  }
 
-Fact.prototype.deleteHtml = function() {
-  return '' +
-    '<form action="/delete" method="POST" class="delete-form">\n' +
-    '<input class="delete-uuid" type="hidden" name="uuid" value="' + this.uuid + '" />\n' +
-    '<input class="delete-button" type="submit" value="X" />\n' +
-    '</form>'
-}
+  toJson() {
+    return {
+      subject: this.subject,
+      verb:    this.verb,
+      mods:    this.mods.map(function(mod) { return mod.toJson(); }),
+      uuid:    this.uuid
+    };
+  }
 
-Fact.prototype.toHtml = function() {
-  return '<li>' + this.deleteHtml() + this.toString() + '</li>\n';
+  deleteHtml() {
+    return '' +
+      '<form action="/delete" method="POST" class="delete-form">\n' +
+      '<input class="delete-uuid" type="hidden" name="uuid" value="' + this.uuid + '" />\n' +
+      '<input class="delete-button" type="submit" value="X" />\n' +
+      '</form>'
+  }
+
+  toHtml() {
+    return '<li>' + this.deleteHtml() + this.toString() + '</li>\n';
+  }
 }
 
 ////////////////////////////////////////////////////////
 // Facts                                              //
 ////////////////////////////////////////////////////////
 
-function Facts(facts) {
-  this.facts = facts || [];
-}
-
 // Factory method to load facts from json
 function loadFacts(json) {
   return new Facts(json.map(loadFact));
 }
 
-Facts.prototype.push = function(subject, verb, mods) {
-  this.facts.push(new Fact(subject, verb, mods));
-};
-
-Facts.prototype.remove = function(uuid) {
-  var index = this.facts.findIndex(function(fact, index, facts) {
-    return uuid == fact.uuid;
-  });
-
-  if ( index >= 0 ) {
-    this.facts.splice(index, 1);
+class Facts {
+  constructor(facts=[]) {
+    this.facts = facts;
   }
-}
 
-Facts.prototype.toString = function() {
-  return this.facts.join('\n');
-}
+  push(subject, verb, mods) {
+    this.facts.push(new Fact(subject, verb, mods));
+  }
 
-Facts.prototype.toJson = function() {
-  return this.facts.map(function(fact) {
-           return fact.toJson();
-         });
-}
+  remove(uuid) {
+    var index = this.facts.findIndex(function(fact, index, facts) {
+      return uuid == fact.uuid;
+    });
 
-Facts.prototype.toHtml = function() {
-  var elems = this.facts.map(function(fact) {
-    return fact.toHtml();
-  });
-  return '<ul>\n' + elems.join('') + '</ul>\n';
+    if ( index >= 0 ) {
+      this.facts.splice(index, 1);
+    }
+  }
+
+  toString() {
+    return this.facts.join('\n');
+  }
+
+  toJson() {
+    return this.facts.map(function(fact) {
+             return fact.toJson();
+           });
+  }
+
+  toHtml() {
+    var elems = this.facts.map(function(fact) {
+      return fact.toHtml();
+    });
+    return '<ul>\n' + elems.join('') + '</ul>\n';
+  }
 }
 
 ////////////////////////////////////////////////////////
@@ -256,10 +268,10 @@ function main() {
     app.get('/state', function(req, res) {
       res.send(JSON.stringify(mainJson(facts)));
     });
-    
+
     app.post('/add', function(req, res) {
       facts.push(req.body.subject, req.body.verb, (req.body.mods ? req.body.mods : []).map(loadMod));
-    
+
       // there's obviously a race condition here, if
       // another request comes in while we're writing
       // to the file.  we should queue up requests that
@@ -281,7 +293,7 @@ function main() {
         res.send(JSON.stringify({ok: true}));
       });
     });
-    
+
     app.post('/transform', function(req, res) {
       log.info('tranforming ' + req.body.id + ':  ' + req.body.value);
 

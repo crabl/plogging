@@ -16,3 +16,15 @@ look at the "listen()" line of index.js.
 
 Bugs or feature suggestions should go in the Github [issue
 tracker](https://github.com/philipcmonk/plogging/issues).
+
+
+# TODO
+
+[x] convert all prototypes to class notation
+[ ] convert all multi-line strings to backtick notation
+[ ] add a decent theme
+[ ] make it easier to add modifiers
+[ ] determine which words are subject modifier object, automatically?
+[ ] more robust solution than bunyan
+[ ] deploy as webapp
+[ ] package as electron app?
